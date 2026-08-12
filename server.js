@@ -6,11 +6,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const VAPID_PUBLIC_KEY = 'SUA_VAPID_PUBLIC_KEY_AQUI';
-const VAPID_PRIVATE_KEY = 'SUA_VAPID_PRIVATE_KEY_AQUI';
+const VAPID_PUBLIC_KEY = 'BHdR6O65zgqB5hRb8gX3ZQIK6j6srej3lL9uLN1FJOhSoxOlyeEyC597NReR_bBJHgb9O-u6hBnzL6YXUu_neDg';
+const VAPID_PRIVATE_KEY = 'iwQHOM7r0R9le5Y5OWEcDKUZSvHGGl2CgjRElMb1BN4';
 
 webpush.setVapidDetails(
-  'mailto:seuemail@exemplo.com',
+  'mailto:matheusmaia.pmf@gmail.com',
   VAPID_PUBLIC_KEY,
   VAPID_PRIVATE_KEY
 );
