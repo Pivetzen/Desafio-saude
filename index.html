@@ -3,36 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>App de Notificações</title>
+  <title>Missão Diária</title>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f8f9fa; color: #333; text-align: center; padding: 20px; }
-    .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 350px; width: 100%; }
-    button { width: 100%; padding: 14px; font-size: 16px; font-weight: bold; color: white; background: #007bff; border: none; border-radius: 8px; cursor: pointer; margin-top: 15px; }
+    body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f4f6f9; color: #333; text-align: center; padding: 20px; }
+    .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 380px; width: 100%; }
+    button { width: 100%; padding: 14px; font-size: 16px; font-weight: bold; color: white; background: #007bff; border: none; border-radius: 8px; cursor: pointer; margin-top: 20px; }
     button:disabled { background: #6c757d; }
-    #status { margin-top: 15px; font-size: 14px; color: #666; word-break: break-all; }
+    #status { margin-top: 15px; font-size: 14px; color: #666; }
   </style>
 </head>
 <body>
 
   <div class="card">
-    <h2>Notificações Agendadas</h2>
-    <p>Clique no botão abaixo para registrar este celular para receber alertas.</p>
+    <h2>🎯 Missão Diária</h2>
+    <p>Receba sua missão todos os dias direto na tela do seu celular.</p>
     <button id="btnAtivar">Ativar Notificações</button>
     <p id="status"></p>
   </div>
 
   <script>
-    // URL da implantação do seu Google Apps Script
-    const SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwwUGWf6fQIJs1V3yR8a4gAy8artT6-F4wrksM1_Q989JnXI7Xd3ixHXCy0Mg6wgjDA/exec';
+    // URL da sua implantação do Google Apps Script
+    const SCRIPT_URL = 'https://script.google.com/macros/s/SEU_SCRIPT_ID_AQUI/exec';
+    
+    // Chave Pública VAPID (gerada no servidor Node.js ou em vapidkeys.com)
+    const PUBLIC_VAPID_KEY = 'SUA_VAPID_PUBLIC_KEY_AQUI';
 
-    // Cria ou resgata um tópico exclusivo para este aparelho
-    function getDeviceTopic() {
-      let topic = localStorage.getItem('ntfy_device_topic');
-      if (!topic) {
-        topic = 'desafio_saude_' + Math.random().toString(36).substring(2, 10);
-        localStorage.setItem('ntfy_device_topic', topic);
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
       }
-      return topic;
+      return outputArray;
     }
 
     document.getElementById('btnAtivar').addEventListener('click', async () => {
@@ -40,26 +44,45 @@
       const status = document.getElementById('status');
       btn.disabled = true;
 
-      const deviceTopic = getDeviceTopic();
-      status.innerText = "Cadastrando dispositivo...";
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        status.innerText = "Seu navegador não suporta notificações Push.";
+        return;
+      }
 
       try {
-        await fetch(SCRIPT_WEB_APP_URL, {
+        status.innerText = "Solicitando permissão...";
+        const permission = await Notification.requestPermission();
+        
+        if (permission !== 'granted') {
+          status.innerText = "Permissão negada pelo usuário.";
+          btn.disabled = false;
+          return;
+        }
+
+        // Registra um Service Worker básico na página
+        const registration = await navigator.serviceWorker.register('sw.js');
+        
+        // Inscreve o navegador no serviço de Push da Apple/Google
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
+        });
+
+        status.innerText = "Salvando na base de dados...";
+
+        // Envia o JSON da inscrição para a planilha no Google Sheets
+        await fetch(SCRIPT_URL, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: deviceTopic })
+          body: JSON.stringify({ subscription: subscription })
         });
 
-        status.innerHTML = `
-          <strong>Cadastrado com sucesso!</strong><br><br>
-          Para receber na tela de bloqueio, abra o app <strong>ntfy</strong> e se inscreva no tópico:<br><br>
-          <mark><strong>${deviceTopic}</strong></mark>
-        `;
-        btn.innerText = "Notificações Ativas";
+        status.innerText = "Notificações ativadas com sucesso!";
+        btn.innerText = "Ativo no Celular";
       } catch (err) {
         console.error(err);
-        status.innerText = "Erro ao cadastrar: " + err.message;
+        status.innerText = "Erro ao ativar: " + err.message;
         btn.disabled = false;
       }
     });
