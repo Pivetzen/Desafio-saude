@@ -4,20 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>App de Notificações</title>
-  <link rel="manifest" href="manifest.json">
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f8f9fa; color: #333; text-align: center; padding: 20px; }
     .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 350px; width: 100%; }
     button { width: 100%; padding: 14px; font-size: 16px; font-weight: bold; color: white; background: #007bff; border: none; border-radius: 8px; cursor: pointer; margin-top: 15px; }
     button:disabled { background: #6c757d; }
-    #status { margin-top: 15px; font-size: 14px; color: #666; }
+    #status { margin-top: 15px; font-size: 14px; color: #666; word-break: break-all; }
   </style>
 </head>
 <body>
 
   <div class="card">
     <h2>Notificações Agendadas</h2>
-    <p>Clique no botão abaixo para receber avisos e lembretes neste celular.</p>
+    <p>Clique no botão abaixo para registrar este celular para receber alertas.</p>
     <button id="btnAtivar">Ativar Notificações</button>
     <p id="status"></p>
   </div>
@@ -25,77 +24,38 @@
   <script>
     // URL da implantação do seu Google Apps Script
     const SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwwUGWf6fQIJs1V3yR8a4gAy8artT6-F4wrksM1_Q989JnXI7Xd3ixHXCy0Mg6wgjDA/exec';
-    
-    // Chave VAPID Pública P-256 válida (87 caracteres)
-    const VAPID_PUBLIC_KEY = 'BHdR6O65zgqB5hRb8gX3ZQIK6j6srej3lL9uLN1FJOhSoxOlyeEyC597NReR_bBJHgb9O-u6hBnzL6YXUu_neDg';
 
-    function urlBase64ToUint8Array(base64String) {
-      const padding = '='.repeat((4 - base64String.length % 4) % 4);
-      const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-      
-      const rawData = window.atob(base64);
-      const outputArray = new Uint8Array(rawData.length);
-      
-      for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
+    // Cria ou resgata um tópico exclusivo para este aparelho
+    function getDeviceTopic() {
+      let topic = localStorage.getItem('ntfy_device_topic');
+      if (!topic) {
+        topic = 'desafio_saude_' + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem('ntfy_device_topic', topic);
       }
-      return outputArray;
-    }
-
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      navigator.serviceWorker.register('sw.js')
-        .then(() => console.log('Service Worker Registrado!'))
-        .catch(err => console.error('Erro no SW:', err));
+      return topic;
     }
 
     document.getElementById('btnAtivar').addEventListener('click', async () => {
       const btn = document.getElementById('btnAtivar');
       const status = document.getElementById('status');
-      
-      if (!('Notification' in window)) {
-        status.innerHTML = "<strong>Atenção:</strong> No iPhone, adicione este site à <strong>Tela de Início</strong> (via menu Compartilhar do Safari) e abra por lá para ativar as notificações.";
-        return;
-      }
-
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        status.innerText = "Este navegador não suporta notificações Push.";
-        return;
-      }
-
       btn.disabled = true;
-      status.innerText = "Solicitando permissão...";
+
+      const deviceTopic = getDeviceTopic();
+      status.innerText = "Cadastrando dispositivo...";
 
       try {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          status.innerText = "Permissão negada pelo usuário.";
-          btn.disabled = false;
-          return;
-        }
-
-        const reg = await navigator.serviceWorker.ready;
-        let sub = await reg.pushManager.getSubscription();
-        
-        // Remove incrições antigas com chaves inválidas salvas no cache do navegador
-        if (sub) {
-          await sub.unsubscribe();
-        }
-
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-        });
-
-        status.innerText = "Salvando no servidor...";
-
         await fetch(SCRIPT_WEB_APP_URL, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sub)
+          body: JSON.stringify({ topic: deviceTopic })
         });
 
-        status.innerText = "Celular cadastrado com sucesso! Pode fechar o aplicativo.";
+        status.innerHTML = `
+          <strong>Cadastrado com sucesso!</strong><br><br>
+          Para receber na tela de bloqueio, abra o app <strong>ntfy</strong> e se inscreva no tópico:<br><br>
+          <mark><strong>${deviceTopic}</strong></mark>
+        `;
         btn.innerText = "Notificações Ativas";
       } catch (err) {
         console.error(err);
