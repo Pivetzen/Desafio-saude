@@ -6,26 +6,30 @@
   <title>Missão Diária</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f4f6f9; color: #333; text-align: center; padding: 20px; }
-    .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 380px; width: 100%; }
+    .card { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 380px; width: 100%; text-align: left; }
+    h2 { margin-top: 0; text-align: center; }
+    label { font-size: 14px; font-weight: bold; color: #555; display: block; margin-top: 15px; }
+    input[type="text"] { width: 100%; padding: 12px; margin-top: 6px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
     button { width: 100%; padding: 14px; font-size: 16px; font-weight: bold; color: white; background: #007bff; border: none; border-radius: 8px; cursor: pointer; margin-top: 20px; }
     button:disabled { background: #6c757d; }
-    #status { margin-top: 15px; font-size: 14px; color: #666; }
+    #status { margin-top: 15px; font-size: 14px; color: #666; text-align: center; }
   </style>
 </head>
 <body>
 
   <div class="card">
     <h2>🎯 Missão Diária</h2>
-    <p>Receba sua missão todos os dias direto na tela do seu celular.</p>
+    <p style="text-align: center; font-size: 14px; color: #666;">Receba sua missão todos os dias direto na tela do seu celular.</p>
+    
+    <label for="nome">Seu Nome:</label>
+    <input type="text" id="nome" placeholder="Digite seu nome completo">
+
     <button id="btnAtivar">Ativar Notificações</button>
     <p id="status"></p>
   </div>
 
   <script>
-    // URL da sua implantação do Google Apps Script
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwwUGWf6fQIJs1V3yR8a4gAy8artT6-F4wrksM1_Q989JnXI7Xd3ixHXCy0Mg6wgjDA/exec';
-    
-    // Chave Pública VAPID (gerada no servidor Node.js ou em vapidkeys.com)
     const PUBLIC_VAPID_KEY = 'BHdR6O65zgqB5hRb8gX3ZQIK6j6srej3lL9uLN1FJOhSoxOlyeEyC597NReR_bBJHgb9O-u6hBnzL6YXUu_neDg';
 
     function urlBase64ToUint8Array(base64String) {
@@ -42,6 +46,13 @@
     document.getElementById('btnAtivar').addEventListener('click', async () => {
       const btn = document.getElementById('btnAtivar');
       const status = document.getElementById('status');
+      const nomeInput = document.getElementById('nome').value.trim();
+
+      if (!nomeInput) {
+        alert("Por favor, digite seu nome antes de continuar.");
+        return;
+      }
+
       btn.disabled = true;
 
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -59,23 +70,22 @@
           return;
         }
 
-        // Registra um Service Worker básico na página
         const registration = await navigator.serviceWorker.register('sw.js');
-        
-        // Inscreve o navegador no serviço de Push da Apple/Google
         const subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
         });
 
-        status.innerText = "Salvando na base de dados...";
+        status.innerText = "Salvando dados...";
 
-        // Envia o JSON da inscrição para a planilha no Google Sheets
         await fetch(SCRIPT_URL, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subscription: subscription })
+          body: JSON.stringify({
+            nome: nomeInput,
+            subscription: subscription
+          })
         });
 
         status.innerText = "Notificações ativadas com sucesso!";
