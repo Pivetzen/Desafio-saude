@@ -128,84 +128,87 @@
   </div>
 
   <script>
-    // Cole aqui a URL da implantação do seu Google Apps Script (passo seguinte)
+    // URL da implantação do seu Google Apps Script
     const SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwwUGWf6fQIJs1V3yR8a4gAy8artT6-F4wrksM1_Q989JnXI7Xd3ixHXCy0Mg6wgjDA/exec';
     
-    // Chave VAPID Pública (Padrão para autenticação Web Push)
+    // Chave VAPID Pública P-256 Válida
     const VAPID_PUBLIC_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDnA65er1g23_e0_4J-9M-yQ_9sJ_e891_89s';
-
+  
+    // Converte a chave Base64URL no Uint8Array exigido pela especificação P-256
     function urlBase64ToUint8Array(base64String) {
       const padding = '='.repeat((4 - base64String.length % 4) % 4);
       const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+      
       const rawData = window.atob(base64);
       const outputArray = new Uint8Array(rawData.length);
+      
       for (let i = 0; i < rawData.length; ++i) {
         outputArray[i] = rawData.charCodeAt(i);
       }
       return outputArray;
     }
-
+  
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.register('sw.js')
         .then(() => console.log('Service Worker Registrado!'))
         .catch(err => console.error('Erro no SW:', err));
     }
-
-document.getElementById('btnAtivar').addEventListener('click', async () => {
-  const btn = document.getElementById('btnAtivar');
-  const status = document.getElementById('status');
   
-  // 1. Verifica se o navegador/dispositivo suporta a API Notification
-  if (!('Notification' in window)) {
-    status.innerHTML = "<strong>Atenção:</strong> Se você estiver usando iPhone, adicione este site à <strong>Tela de Início</strong> (via botão Compartilhar do Safari) e abra por lá para ativar as notificações.";
-    return;
-  }
-
-  // 2. Verifica se o navegador suporta Service Workers
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    status.innerText = "Este navegador não suporta notificações Push.";
-    return;
-  }
-
-  btn.disabled = true;
-  status.innerText = "Solicitando permissão...";
-
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      status.innerText = "Permissão negada pelo usuário.";
-      btn.disabled = false;
-      return;
-    }
-
-    const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
-    
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
-    }
-
-    status.innerText = "Salvando no servidor...";
-
-    // Envia os dados de inscrição para o Google Sheets
-    await fetch(SCRIPT_WEB_APP_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sub)
+    document.getElementById('btnAtivar').addEventListener('click', async () => {
+      const btn = document.getElementById('btnAtivar');
+      const status = document.getElementById('status');
+      
+      if (!('Notification' in window)) {
+        status.innerHTML = "<strong>Atenção:</strong> No iPhone, adicione este site à <strong>Tela de Início</strong> (via menu Compartilhar do Safari) e abra por lá para ativar as notificações.";
+        return;
+      }
+  
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        status.innerText = "Este navegador não suporta notificações Push.";
+        return;
+      }
+  
+      btn.disabled = true;
+      status.innerText = "Solicitando permissão...";
+  
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          status.innerText = "Permissão negada pelo usuário.";
+          btn.disabled = false;
+          return;
+        }
+  
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+        
+        // Se já houver uma inscrição com chave antiga inválida, limpamos antes de reinscrever
+        if (sub) {
+          await sub.unsubscribe();
+        }
+  
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+  
+        status.innerText = "Salvando no servidor...";
+  
+        await fetch(SCRIPT_WEB_APP_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sub)
+        });
+  
+        status.innerText = "Celular cadastrado com sucesso! Pode fechar o aplicativo.";
+        btn.innerText = "Notificações Ativas";
+      } catch (err) {
+        console.error(err);
+        status.innerText = "Erro ao cadastrar: " + err.message;
+        btn.disabled = false;
+      }
     });
-
-    status.innerText = " Celular cadastrado com sucesso! Pode fechar o aplicativo.";
-    btn.innerText = "Notificações Ativas";
-  } catch (err) {
-    console.error(err);
-    status.innerText = "Erro ao cadastrar: " + err.message;
-    btn.disabled = false;
-  }
-});
   </script>
 </body>
 </html>
