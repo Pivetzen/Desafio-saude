@@ -1,39 +1,15 @@
-// Escuta a notificação push vinda do servidor
-self.addEventListener('push', function(event) {
-  let data = { title: 'Nova Notificação', body: 'Você recebeu uma mensagem!' };
-
-  if (event.data) {
-    try {
-      data = event.data.json();
-    } catch (e) {
-      data.body = event.data.text();
-    }
-  }
-
+self.addEventListener('push', event => {
+  const data = event.data ? event.data.json() : {};
+  
+  const title = data.title || '🎯 Missão Diária';
   const options = {
-    body: data.body,
-    icon: 'https://via.placeholder.com/192',
-    badge: 'https://via.placeholder.com/192',
-    vibrate: [200, 100, 200],
-    data: {
-      url: data.url || './'
-    }
+    body: data.body || 'Você tem uma nova missão agendada!',
+    icon: 'https://cdn-icons-png.flaticon.com/512/3119/3119338.png',
+    badge: 'https://cdn-icons-png.flaticon.com/512/3119/3119338.png',
+    vibrate: [100, 50, 100]
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
-});
-
-// Ao clicar na notificação, abre o app
-self.addEventListener('notificationclick', function(event) {
-  event.notification.close();
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      if (clientList.length > 0) {
-        return clientList[0].focus();
-      }
-      return clients.openWindow(event.notification.data.url);
-    })
+    self.registration.showNotification(title, options)
   );
 });
